@@ -966,7 +966,7 @@ class App:
                 CONFIG_DATA["Added Media"].setdefault(
                     filename, "True"
                 )
-            with open(CONFIG_PATH, "w") as configfile:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as configfile:
                 Config.config.write(configfile)
             tags = AnkiConnect.parse(result[0])
             directory_responses = result[2:]
