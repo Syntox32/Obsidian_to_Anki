@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Script for adding cards to Anki from Obsidian."""
 
 import re
@@ -319,7 +320,7 @@ class FormatConverter:
         """Get all the images that need to be added."""
         for match in FormatConverter.IMAGE_REGEXP.finditer(html_text):
             path = match.group(1)
-            print(path)
+            print("get_images: {}".format(path))
             if FormatConverter.is_url(path):
                 continue  # Skips over images web-hosted.
             filename = os.path.basename(path)
@@ -419,12 +420,22 @@ class Note:
         r"(?:<!--)?" + ID_PREFIX + r"(\d+)"
     )
 
+    # Detect "lorem ![[Pasted image from clipboard.png]] ipsum"
+    IMG_REGEXP = re.compile(
+        r"(\!\[\[([a-zA-Z0-9\-_\s\.]+(\.png|\.jpg|.jpeg))\]\])"
+    )
+
     def __init__(self, note_text):
         """Set up useful variables."""
-        self.text = note_text
+
+        # Hotfix inline images being ![[]] not ![]()
+        self.text = Note.hotfix_obsidian_images(note_text)
+        
         self.lines = self.text.splitlines()
         self.current_field_num = 0
         self.delete = False
+
+
         if Note.ID_REGEXP.match(self.lines[-1]):
             self.identifier = int(
                 Note.ID_REGEXP.match(self.lines.pop()).group(1)
@@ -517,6 +528,35 @@ class Note:
             return Note_and_id(note=template, id=self.identifier)
         else:
             return Note_and_id(note=False, id=self.identifier)
+    
+    @staticmethod
+    def hotfix_obsidian_images(note_text):
+        """
+        Convert an image from "![[lorem.png]]" to the style 
+        "![](/home/user/notes/attachments/lorem.png)" such that
+        Anki will include the local file
+
+        The script has to point to the root of the obsidian vault directory.
+
+        Returns: the modified note text
+        """
+        # If there is no attachment directory then we
+        # cannot actually point to anywhere
+        if "OBSIDIAN_ATTACHMENT_DIR" not in CONFIG_DATA:
+            return note_text
+            
+        shadow_buffer = note_text
+        img_match = Note.IMG_REGEXP.finditer(note_text)
+        for match in img_match:
+            full_match = match.group(1)
+            img_match = match.group(2)
+            img_fullpath = os.path.join(CONFIG_DATA["OBSIDIAN_ATTACHMENT_DIR"], img_match)
+            img_new_local_linked = "![]({})".format(img_fullpath)
+            shadow_buffer = shadow_buffer.replace(full_match, img_new_local_linked)
+            print("Info: Modifying image link: {}".format(img_match))
+            print("\t -> {}".format(img_new_local_linked))
+        return shadow_buffer
+
 
 
 class InlineNote(Note):
@@ -838,6 +878,23 @@ class App:
         else:
             self.setup_cli_parser()
         args = self.parser.parse_args()
+
+        # Attempt to locate obsidion config directory
+        if os.path.isdir(os.path.join(args.path, ".obsidian")):
+            print("FOUND")
+            CONFIG_DATA["OBSIDIAN_CONFIG_PATH"] = os.path.join(args.path, ".obsidian")
+            with open(os.path.join(args.path, ".obsidian", "config"), "r", encoding="utf-8") as f:
+                obsidian_config = json.load(f)
+            if "attachmentFolderPath" in obsidian_config:
+                attachment_dir = os.path.join(args.path, obsidian_config["attachmentFolderPath"])
+                CONFIG_DATA["OBSIDIAN_ATTACHMENT_DIR"] = attachment_dir
+                print("Obsidian attachment directory: {}".format(attachment_dir))
+            else:
+                print("Warn: Obsidian config did not have an attachment directory specified. " + \
+                       "Attachments will not be added in your flashcards.")
+        else:
+            print("NOT FOUND: ", os.path.join(args.path, ".obsidian"))
+
         if CONFIG_DATA["GUI"] and GOOEY:
             if args.directory:
                 args.path = args.directory
