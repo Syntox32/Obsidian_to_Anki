@@ -253,7 +253,7 @@ Displayed $$z = 10$$
 
 ### Image formatting
 
-Embedded images are supported if they are embedded using the standard markdown syntax: `![alt-text](path_to_image)`
+Embedded images are supported. This requires you run the script in the root directory of your Obsidian vault, **and** have set an *attachment folder* in your settings. Only `png`, `jpg`, and `jpeg` is supported so far.
 
 v2.3 - Web-hosted images are now supported! Do `![alt-text](image_url)`. You'll want to do 'copy image address' on the image, and use that for the image url.
 
