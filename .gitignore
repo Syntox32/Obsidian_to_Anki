@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Script specific files
+obsidian_to_anki_config.ini
